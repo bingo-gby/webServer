@@ -34,10 +34,10 @@ private:
 
 class SqlConnRALL{
 public:
-    SqlConnRALL(MYSQL* sql,SqlConnPool * connPool){
+    SqlConnRALL(MYSQL** sql,SqlConnPool* connPool){
         assert(connPool);
-        sql = connPool->getConn();
-        m_sql = sql;
+        *sql = connPool->getConn();
+        m_sql = *sql;
         m_connPool = connPool;
     }
     ~SqlConnRALL(){

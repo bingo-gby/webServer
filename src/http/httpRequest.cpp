@@ -128,3 +128,168 @@ int HttpRequest::ConverHex(char ch) {
     }
 }
 // 解析POST请求
+void HttpRequest::parsePost() {
+    if (m_method == "POST" && m_headers["Content-Type"] == "application/x-www-form-urlencoded") {
+        parseFromUrlencoded();
+        if (DEFAULT_HTML_TAG.count(m_path)) {
+            int tag = DEFAULT_HTML_TAG.find(m_path)->second;
+            LOG_DEBUG("Tag: %d", tag);
+            if (tag == 0 || tag == 1) {
+                // 用户验证
+                bool isLogin = (tag == 1);
+                if (UserVerify(m_post["username"], m_post["password"], isLogin)) {
+                    m_path = "/welcome.html";
+                } else {
+                    m_path = "/error.html";
+                }
+            }
+        }
+    }
+}
+
+// 解析url编码
+// 是 key=value&key=value的形式
+// 其中+ 和 %20 都是代表空格
+// % 表示后面的两个字符是16进制的数，可以转为10进制
+void HttpRequest::parseFromUrlencoded() {
+    if (m_body.size() == 0) {
+        return;
+    }
+    std::string key, value;
+    int num = 0;
+    int n = m_body.size();
+    int i = 0, j = 0;
+    // i是遍历m_body的下标
+    for (; i < n; ++i) {
+        char ch = m_body[i];
+        switch (ch) {
+            case '=':
+                key = m_body.substr(j, i - j);
+                j = i + 1;
+                break;
+            case '+':
+                m_body[i] = ' ';
+                break;
+            case '%':
+                num = ConverHex(m_body[i + 1]) * 16 + ConverHex(m_body[i + 2]);
+                m_body[i + 2] = num % 10 + '0';
+                m_body[i + 1] = num / 10 + '0';
+                i += 2;
+                break;
+            case '&':
+                value = m_body.substr(j, i - j);
+                j = i + 1;
+                m_post[key] = value;
+                LOG_DEBUG("%s = %s", key.c_str(), value.c_str());
+                break;
+            default:
+                break;
+        }
+    }
+    // 遍历完之后，理论上是最后一个key没有value，此时 j是=后面，i是n
+    assert(j <= i);
+    if (m_post.count(key) == 0 && j < i) {
+        value = m_body.substr(j, i - j);
+        m_post[key] = value;
+    }
+}
+
+// 类外定义静态函数不需要再写 static
+// isLogin 代表是登录还是注册
+bool HttpRequest::UserVerify(const std::string& name, const std::string& pwd, bool isLogin) {
+    if (name == "" || pwd == "") {
+        return false;
+    }
+    LOG_INFO("Verify name: %s pwd: %s", name.c_str(), pwd.c_str());
+    MYSQL* sql;
+    SqlConnRALL con(&sql, SqlConnPool::instance());  // 第一个参数是二重指针
+    assert(sql);
+    bool flag = false;
+    unsigned int j = 0;
+    char order[256] = {0};  // 用于构建sql语句
+    MYSQL_RES* res = nullptr;  // 指向查询结果集的指针
+    MYSQL_FIELD* field = nullptr; // 指向查询结果字段的指针
+    if (!isLogin) { flag = true; } 
+    // 从user表中查询用户名为name的记录，返回用户名和密码
+    snprintf(order, 256, "SELECT username, password FROM user WHERE username='%s' LIMIT 1", name.c_str());
+    LOG_DEBUG("%s", order);
+
+    // 函数执行失败，返回1
+    if(mysql_query(sql, order)) {
+        mysql_free_result(res);
+        return false;
+    }
+    // sql包含了查询结果
+    res = mysql_store_result(sql);
+    j = mysql_num_fields(res);  // 获取结果集中字段的数量
+    field = mysql_fetch_fields(res);  // 获取结果集的字段信息，并存储在指针 fields 中
+
+    // 一行行从结果集取数据，放到 row里
+    while (MYSQL_ROW row = mysql_fetch_row(res)) {
+        LOG_DEBUG("MYSQL ROW: %s %s", row[0], row[1]);  // row[0]是用户名，row[1]是密码
+        std::string password(row[1]);
+        // 看是不是登录操作
+        if (isLogin) {
+            if (pwd == password) {
+                flag = true;
+            } else {
+                flag = false;
+                LOG_DEBUG("pwd error!");
+            }
+        } else {
+            flag = false;   
+            LOG_DEBUG("user used!");   // 注册操作，查询到了该用户名，说明已经被注册了
+        }
+    }
+    mysql_free_result(res);
+
+    // 如果是注册操作，且用户名没有被注册过
+    if (!isLogin && flag == true) {
+        bzero(order, 256);  //  清空数组
+        // 构建插入语句
+        snprintf(order, 256, "INSERT INTO user(username, password) VALUES('%s', '%s')", name.c_str(), pwd.c_str());
+        LOG_DEBUG("%s", order);
+        if (mysql_query(sql, order)) {
+            LOG_DEBUG("Insert error!");
+            flag = false;
+        } else {
+            flag = true;   // 注册成功
+        }
+    }
+    LOG_DEBUG("UserVerify success!");
+    return flag;
+}
+
+std::string HttpRequest::path() const {
+    return m_path;
+}
+
+std::string& HttpRequest::path() {
+    return m_path;
+}
+
+std::string HttpRequest::method() const {
+    return m_method;
+}
+
+std::string HttpRequest::version() const {
+    return m_version;
+}
+
+std::string HttpRequest::getPost(const std::string& key) const {
+    assert(key != "");
+    if (m_post.count(key) == 1) {
+        return m_post.find(key)->second;
+    }
+    return "";
+}
+
+// 字符数组，会隐式转换为string
+std::string HttpRequest::getPost(const char* key) const {
+    assert(key != nullptr);
+    if (m_post.count(key) == 1) {
+        return m_post.find(key)->second;
+    }
+    return "";
+}
+

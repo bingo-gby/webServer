@@ -43,6 +43,7 @@ private:
 
     void parsePath();   // 解析路径
     void parsePost();   // 解析POST请求
+    void parseFromUrlencoded(); // 解析url编码
 
     static bool UserVerify(const std::string& name, const std::string& pwd, bool isLogin);  // 用户验证
     static int ConverHex(char ch);  // 16进制转为10进制
