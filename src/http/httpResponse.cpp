@@ -72,7 +72,7 @@ void HttpResponse::makeResponse(Buffer& buff) {
     errorHtml_();  // 生成错误响应报文的 HTML 内容
     addStateLine_(buff);  //添加状态行
     addHeader_(buff);    //添加响应头
-    addContent_(buff);   //添加响应体
+    addContent_(buff);   //添加响应体，此时内容在 m_mmFile 中
 }
 
 char* HttpResponse::file() {
@@ -126,9 +126,49 @@ void HttpResponse::addContent_(Buffer& buff) {
         errorContent(buff, "File NotFound!");
         return;
     }
-    m_mmFile = (char*)mmRet;
-    close(srcFd);
+    m_mmFile = (char*)mmRet;  // 返回映射文件的指针
+    close(srcFd);  // 关闭文件
     buff.append("Content-length: " + std::to_string(m_mmFileStat.st_size) + "\r\n\r\n");
 }
+
+void HttpResponse::unmapFile() {
+    if (m_mmFile) {
+        munmap(m_mmFile, m_mmFileStat.st_size);
+        m_mmFile = nullptr;  
+    }
+}
+
+std::string HttpResponse::getFileType_() {
+    std::string::size_type idx = m_path.find_last_of('.');  // 找到文件名中最后一个 . 的位置
+    if (idx == std::string::npos) {
+        return "text/plain";
+    }
+    std::string suffix = m_path.substr(idx);  // 获取文件后缀
+    if (SUFFIX_TYPE.count(suffix) == 1) {
+        return SUFFIX_TYPE.find(suffix)->second;
+    }
+    return "text/plain";  // text/plain 是默认的文件类型,纯文本文件
+}
+
+// 把错误信息写入到 buff 中，其实就是 File NotFound! 的 html 内容
+void HttpResponse::errorContent(Buffer& buff, std::string message) {
+    std::string body;
+    std::string status;
+    if (CODE_STATUS.count(m_code) == 1) {
+        status = CODE_STATUS.find(m_code)->second;
+    } else {
+        status = "Bad Request";
+    }
+    body += "<html><title>Error</title>";
+    body += "<body bgcolor=\"ffffff\">";
+    body += std::to_string(m_code) + " : " + status + "\n";
+    body += "<p>" + message + "</p>";
+    body += "<hr><em>WebServer</em></body></html>";
+
+    buff.append("Content-length: " + std::to_string(body.size()) + "\r\n\r\n");
+    buff.append(body);
+}
+
+
 
   
