@@ -36,7 +36,7 @@ public:
     ~HeapTimer() { clear(); }
 
     // 调整指定 id 的超时时间
-    void adjust(int id, int newExpires); 
+    void adjust(int id, int newExpires, const TimeoutCallBack& cb); 
     // 添加一个定时器
     void add(int id, int timeOut, const TimeoutCallBack& cb);
 
