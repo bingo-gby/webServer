@@ -1,5 +1,5 @@
-#include "../log/log.h"
-#include "../pool/threadpool.h"
+#include "../src/log/log.h"
+#include "../src/pool/threadpool.h"
 
 // level=3时，当 i>=3 才被记录，所以level为3时， 3 输出10次
 // level=2时,  2 3各10次，依次类推 debug 10次， info 20次 warn 30次 error 40次，总共100次
