@@ -3,9 +3,9 @@
 webServer::webServer(int port, int trigMode, int timeoutMS, 
                      bool OptLinger, int sqlPort, const char* sqlUser, 
                      const char* sqlPwd, const char* dbName, 
-                     int connPoolNum, int threadNum, int openLog, 
-                     int logLevel, int logQueSize) 
-    : port_(port), openLinger_(OptLinger), timeoutMS_(timeoutMS), isClose_(false),
+                     int connPoolNum, int threadNum, bool openLog, 
+                     int logLevel, int logQueSize) :
+                     port_(port), openLinger_(OptLinger), timeoutMS_(timeoutMS), isClose_(false),
       timer_(new HeapTimer()), threadpool_(new ThreadPool(threadNum)), epoller_(new Epoller())
 {
     srcDir_ = getcwd(nullptr, 256); // 获取当前工作目录
@@ -16,10 +16,7 @@ webServer::webServer(int port, int trigMode, int timeoutMS,
 
     initEventMode_(trigMode);  // 初始化事件模式
     //  初始化数据库连接池
-    if (!SqlConnPool::Instance()->init("localhost", sqlPort, sqlUser, sqlPwd, dbName, connPoolNum)) {
-        LOG_ERROR("SqlConnPool init error");
-        exit(1);
-    }
+    SqlConnPool::instance()->init("localhost", sqlPort, sqlUser, sqlPwd, dbName, connPoolNum);
     if(initSocket_()) { // 初始化socket
         isClose_ = false;
         LOG_INFO("Init socket success");
@@ -30,7 +27,7 @@ webServer::webServer(int port, int trigMode, int timeoutMS,
 
     // 是否打开日志标志
     if(openLog) {
-        Log::Instance()->init(logLevel, "./log", ".log", logQueSize);
+        Log::instance()->init(logLevel, "./log", ".log", logQueSize);
         if(isClose_) {
             LOG_ERROR("Server init error");
             exit(1);
@@ -44,7 +41,7 @@ webServer::~webServer() {
     close(listenFd_);
     isClose_ = true;
     free(srcDir_);
-    SqlConnPool::Instance()->closePool();
+    SqlConnPool::instance()->closePool();
 }
 
 void webServer::initEventMode_(int trigMode) {
@@ -125,7 +122,7 @@ void webServer::closeConn_(HttpConn* client) {
     assert(client);
     LOG_INFO("Client[%d] quit!", client->getFd());
     epoller_->delFd(client->getFd());
-    client->close();
+    client->httpclose();
 }
 
 void webServer::addClient_(int fd, sockaddr_in addr) {
@@ -160,14 +157,21 @@ void webServer::dealListen_() {
 
 void webServer::dealRead_(HttpConn* client) {
     assert(client);
-    ExtentTime_(client);
+    extTimer_(client);
     threadpool_->addTask(std::bind(&webServer::onRead_, this, client));
 }
 
 void webServer::dealWrite_(HttpConn* client) {
     assert(client);
-    ExtentTime_(client);
+    extTimer_(client);
     threadpool_->addTask(std::bind(&webServer::onWrite_, this, client));
+}
+
+void webServer::extTimer_(HttpConn* client){
+    assert(client);
+    if(timeoutMS_ >0){
+        timer_->adjust(client->getFd(),timeoutMS_);
+    }
 }
 
 void webServer::onRead_(HttpConn* client) {
@@ -252,7 +256,7 @@ bool webServer::initSocket_(){
     int optVal = 1;
     // 端口复用，只有最后一个套接字会正常接受数据
     // 设置socket选项，允许端口复用
-    ret = setsockopt(listenFd_, SOL_SOCKET, SO_REUSEADDR, (const void*)&optval, sizeof(int));
+    ret = setsockopt(listenFd_, SOL_SOCKET, SO_REUSEADDR, (const void*)&optVal, sizeof(int));
     if(ret == -1){
         LOG_ERROR("set socket setsockopt error !");
         close(listenFd_);
@@ -268,14 +272,14 @@ bool webServer::initSocket_(){
     }
 
     // 监听
-    ret = listen(listenFd_,6)  // 最多有6个连接同时等待接受
+    ret = listen(listenFd_,6);  // 最多有6个连接同时等待接受
     if(ret < 0){
         LOG_ERROR("Listen port:%d error!", port_);
         close(listenFd_);
         return false;   
     }
 
-    ret = epoller_-> addFd(listenFd_,listenEvent_|EPOLLIN) // 加入epoller
+    ret = epoller_-> addFd(listenFd_,listenEvent_|EPOLLIN); // 加入epoller
     if(ret == 0){
         LOG_ERROR("Add listen error!");
         close(listenFd_);
@@ -289,5 +293,5 @@ bool webServer::initSocket_(){
 // 设置非阻塞
 int webServer::setFdNonblock(int fd){
     assert(fd > 0);
-    return fcntl(fd,F_SETFL,fcntl(fd,F_GETFD,0) | 0_NONBLOCK);
+    return fcntl(fd,F_SETFL,fcntl(fd,F_GETFD,0) | O_NONBLOCK);
 }

@@ -55,7 +55,6 @@ private:
 
     static const std::unordered_set<std::string> DEFAULT_HTML;   // 默认html文件
     static const std::unordered_map<std::string, int> DEFAULT_HTML_TAG; // 默认html文件标签
-    static int ConverHex(char ch);
 };
 
 #endif // HTTPREQUEST_H

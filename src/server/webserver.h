@@ -40,7 +40,7 @@ private:
     void closeConn_(HttpConn* client); // 关闭连接
     void onRead_(HttpConn* client); // 读事件
     void onWrite_(HttpConn* client); // 写事件
-    void sendFile_(int fd, const char* fileName); // 发送文件
+    void onProcess(HttpConn* client);
 
     static const int MAX_FD = 65536; // 最大文件描述符
     static int setFdNonblock(int fd); // 设置非阻塞

@@ -57,18 +57,22 @@ void HeapTimer::del_(size_t i) {
 }
 
 //调整指定 id 的节点
-void HeapTimer::adjust(int id, int newExpires,const TimeoutCallBack& cb) {
+void HeapTimer::adjust(int id, int newExpires) {
     assert(!heap.empty() && ref.count(id) > 0);
     heap[ref[id]].expires = Clock::now() + MS(newExpires);
-    heap[ref[id]].cb = cb;
     siftdown_(ref[id], heap.size()); // 因为时间变大了，所以向下调整
 }
 
 // 添加一个定时器
-void HeapTimer::add(int id, int timeOut, const TimeoutCallBack& cb) {
+void HeapTimer::add(int id, int timeOut, const TimeoutCallBack& cb){
     assert(id >= 0);
     if(ref.count(id)) {
-        adjust(id, timeOut, cb);
+        int tmp = ref[id];
+        heap[tmp].expires = Clock::now() + MS(timeOut);
+        heap[tmp].cb = cb;
+        if(!siftdown_(tmp, heap.size())) {
+            siftup_(tmp);
+        }
     }
     else{
         size_t i = heap.size();
@@ -76,11 +80,11 @@ void HeapTimer::add(int id, int timeOut, const TimeoutCallBack& cb) {
         TimeStamp expires = Clock::now() + MS(timeOut);
         heap.push_back({id, expires, cb});
         siftup_(i); // 向上调整即可  
-    }
+    }    
 }
 
 // 删除指定 id ,并调用回调函数
-void HeapTimer::doWork(int id) {
+void HeapTimer::doWork(int id){
     if(heap.empty() || ref.count(id) == 0) {
         return;
     }
@@ -113,8 +117,13 @@ void HeapTimer::pop() {
     del_(0); // 删除堆顶元素
 }
 
+void HeapTimer::clear() {
+    ref.clear();
+    heap.clear();
+}
+
 // 离下一个超时事件还有多久
-int HeapTimer::GetNextTick() {
+int HeapTimer::getNextTick() {
     tick();
     size_t res = -1;
     if(!heap.empty()) {

@@ -33,7 +33,7 @@ bool HttpRequest::parse(Buffer& buff) {
     while (buff.readableBytes() && m_state != FINISH) {
         // 在buff中查找CRLF,后两个是查找字符 前面是查找的范围
         // 输出的是子字符串在主字符串中的位置
-        const char* lineEnd = std::search(buff.peek(), buff.beginWrite(), CRLF, CRLF + 2); 
+        const char* lineEnd = std::search(buff.peek(), const_cast<const char*>(buff.beginWrite()), CRLF, CRLF + 2); 
         std::string line(buff.peek(), lineEnd); // 转换数据，左闭右开区间
         switch (m_state) {
             case REQUEST_LINE:
@@ -171,7 +171,7 @@ void HttpRequest::parseFromUrlencoded() {
                 m_body[i] = ' ';
                 break;
             case '%':
-                num = ConverHex(m_body[i + 1]) * 16 + ConverHex(m_body[i + 2]);
+                num = HttpRequest::ConverHex(m_body[i + 1]) * 16 + HttpRequest::ConverHex(m_body[i + 2]);
                 m_body[i + 2] = num % 10 + '0';
                 m_body[i + 1] = num / 10 + '0';
                 i += 2;
