@@ -1,6 +1,7 @@
 #include "log.h"
 #include <sys/stat.h> // mkdir
 #include <sys/syscall.h>
+#include <filesystem>
 
 Log::Log() {
     m_fp = nullptr;
@@ -91,6 +92,9 @@ void Log::init(int level, const char* path, const char* suffix, bool isPrintCons
     m_path = path;
     m_suffix = suffix;
 
+    if (std::filesystem::exists(m_path)) {
+        std::filesystem::remove_all(m_path); // 删除目录及其内容
+    }
     // 说明是异步模式
     if(maxQueueCapacity > 0) {
         m_isAsync = true;
