@@ -14,17 +14,6 @@ webServer::webServer(int port, int trigMode, int timeoutMS,
     HttpConn::userCount = 0;  // 初始化用户数量
     HttpConn::srcDir = srcDir_; // 设置资源目录
 
-    initEventMode_(trigMode);  // 初始化事件模式
-    //  初始化数据库连接池
-    SqlConnPool::instance()->init("localhost", sqlPort, sqlUser, sqlPwd, dbName, connPoolNum);
-    if(initSocket_()) { // 初始化socket
-        isClose_ = false;
-        LOG_INFO("Init socket success");
-    } else {
-        LOG_ERROR("Init socket error");
-        isClose_ = true;
-    }
-
     // 是否打开日志标志
     if(openLog) {
         Log::instance()->init(logLevel, "./log", ".log", logQueSize);
@@ -34,6 +23,17 @@ webServer::webServer(int port, int trigMode, int timeoutMS,
         } else {
             LOG_INFO("Server init success");
         }
+    }
+
+    initEventMode_(trigMode);  // 初始化事件模式
+    //  初始化数据库连接池
+    SqlConnPool::instance()->init("localhost", sqlPort, sqlUser, sqlPwd, dbName, connPoolNum);
+    if(initSocket_()) { // 初始化socket
+        isClose_ = false;
+        LOG_INFO("Init socket success");
+    } else {
+        LOG_ERROR("Init socket error");
+        isClose_ = true;
     }
 }
 

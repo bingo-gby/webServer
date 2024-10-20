@@ -82,6 +82,10 @@ void Log::asyncWrite() {
 }
 
 void Log::init(int level, const char* path, const char* suffix, bool isPrintConsole, int maxQueueCapacity) {
+#ifdef _DEBUG
+    std::cout<<string(path)<std::endl;
+    std::cout<<string(suffix)<std::endl;
+#endif
     m_isPrintConsole = isPrintConsole;
     m_level = level;
     m_path = path;
@@ -169,7 +173,13 @@ void Log::write(int level,const char* format, ...) {
         }
         std::unique_lock<std::mutex> locker(m_mutex);
         flush();
-        fclose(m_fp);
+        // 关闭文件，避免 m_fp为空时 crash
+        if(m_fp){
+            fclose(m_fp);
+        }
+        #ifdef _DEBUG
+            std::cout<<newFile<<std::endl;
+        #endif
         m_fp = fopen(newFile, "a");  // 重新打开文件
         std::cout<<newFile<<std::endl;
         assert(m_fp != nullptr);
