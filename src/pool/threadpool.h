@@ -25,8 +25,7 @@ public:
                         if(task){
                             task(); // 取出来的是个匿名函数，直接执行
                             std::cout<<"task start"<<std::endl;
-                        }
-                            
+                        }  
                         locker.lock();  // 继续取任务，所以要上锁
                     }
                     else if(m_pool->isClosed){
